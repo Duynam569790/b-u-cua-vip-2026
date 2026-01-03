@@ -1,10 +1,86 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { SymbolType, symbols } from "@/components/Dice";
 import { Dice3D } from "@/components/Dice3D";
 import { BetArea } from "@/components/BetArea";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
+
+// Sound effects using Web Audio API
+const createDiceRollSound = (audioContext: AudioContext) => {
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+  
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+  
+  oscillator.type = 'square';
+  oscillator.frequency.setValueAtTime(150 + Math.random() * 100, audioContext.currentTime);
+  oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.1);
+  
+  gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+  
+  oscillator.start(audioContext.currentTime);
+  oscillator.stop(audioContext.currentTime + 0.1);
+};
+
+const createBounceSound = (audioContext: AudioContext) => {
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+  
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+  
+  oscillator.type = 'sine';
+  oscillator.frequency.setValueAtTime(400 + Math.random() * 200, audioContext.currentTime);
+  oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.05);
+  
+  gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.05);
+  
+  oscillator.start(audioContext.currentTime);
+  oscillator.stop(audioContext.currentTime + 0.05);
+};
+
+const createWinSound = (audioContext: AudioContext) => {
+  const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+  
+  notes.forEach((freq, i) => {
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(freq, audioContext.currentTime + i * 0.1);
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime + i * 0.1);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + i * 0.1 + 0.3);
+    
+    oscillator.start(audioContext.currentTime + i * 0.1);
+    oscillator.stop(audioContext.currentTime + i * 0.1 + 0.3);
+  });
+};
+
+const createLoseSound = (audioContext: AudioContext) => {
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+  
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+  
+  oscillator.type = 'sawtooth';
+  oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+  oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.5);
+  
+  gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+  
+  oscillator.start(audioContext.currentTime);
+  oscillator.stop(audioContext.currentTime + 0.5);
+};
 
 interface GameHistory {
   id: number;
@@ -36,6 +112,52 @@ const Index = () => {
   const [isRolling, setIsRolling] = useState(false);
   const [lastWin, setLastWin] = useState(0);
   const [history, setHistory] = useState<GameHistory[]>([]);
+  
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const rollSoundIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Initialize audio context on first user interaction
+  const initAudio = useCallback(() => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    return audioContextRef.current;
+  }, []);
+
+  // Play rolling sounds continuously while dice are rolling
+  const startRollingSounds = useCallback(() => {
+    const audioContext = initAudio();
+    
+    // Play initial roll sound
+    createDiceRollSound(audioContext);
+    
+    // Play bounce sounds at random intervals
+    rollSoundIntervalRef.current = setInterval(() => {
+      if (Math.random() > 0.3) {
+        createBounceSound(audioContext);
+      }
+      if (Math.random() > 0.6) {
+        createDiceRollSound(audioContext);
+      }
+    }, 100);
+  }, [initAudio]);
+
+  const stopRollingSounds = useCallback(() => {
+    if (rollSoundIntervalRef.current) {
+      clearInterval(rollSoundIntervalRef.current);
+      rollSoundIntervalRef.current = null;
+    }
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopRollingSounds();
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, [stopRollingSounds]);
 
   const totalBet = Object.values(bets).reduce((sum, bet) => sum + bet, 0);
 
@@ -68,6 +190,9 @@ const Index = () => {
 
     setIsRolling(true);
     setLastWin(0);
+    
+    // Start rolling sounds
+    startRollingSounds();
 
     // Animation lắc xúc xắc
     const rollInterval = setInterval(() => {
@@ -76,6 +201,7 @@ const Index = () => {
 
     setTimeout(() => {
       clearInterval(rollInterval);
+      stopRollingSounds();
       
       const finalResults: SymbolType[] = [
         getRandomSymbol(),
@@ -110,11 +236,15 @@ const Index = () => {
         ...prev.slice(0, 9), // Giữ 10 lượt gần nhất
       ]);
 
+      // Play win/lose sound
+      const audioContext = initAudio();
       if (isWin) {
+        createWinSound(audioContext);
         setMoney((prev) => prev + winnings);
         setLastWin(winnings);
         toast.success(`🎉 Thắng ${winnings.toLocaleString()}đ!`);
       } else {
+        createLoseSound(audioContext);
         toast.error("Chúc may mắn lần sau!");
       }
 
@@ -128,7 +258,7 @@ const Index = () => {
         nai: 0,
       });
     }, 2000);
-  }, [totalBet, bets, betAmount]);
+  }, [totalBet, bets, betAmount, startRollingSounds, stopRollingSounds, initAudio]);
 
   const handleClearBets = () => {
     const refund = totalBet * betAmount;
