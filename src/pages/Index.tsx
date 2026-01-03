@@ -3,6 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Dice, SymbolType, symbols } from "@/components/Dice";
 import { BetArea } from "@/components/BetArea";
 import { toast } from "sonner";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+interface GameHistory {
+  id: number;
+  results: SymbolType[];
+  totalBet: number;
+  winAmount: number;
+  isWin: boolean;
+  timestamp: Date;
+}
 
 const symbolKeys = Object.keys(symbols) as SymbolType[];
 
@@ -24,6 +34,7 @@ const Index = () => {
   const [results, setResults] = useState<SymbolType[]>(["bau", "cua", "ca"]);
   const [isRolling, setIsRolling] = useState(false);
   const [lastWin, setLastWin] = useState(0);
+  const [history, setHistory] = useState<GameHistory[]>([]);
 
   const totalBet = Object.values(bets).reduce((sum, bet) => sum + bet, 0);
 
@@ -82,7 +93,23 @@ const Index = () => {
         }
       });
 
-      if (winnings > 0) {
+      const betTotal = totalBet * betAmount;
+      const isWin = winnings > 0;
+
+      // Thêm vào lịch sử
+      setHistory((prev) => [
+        {
+          id: Date.now(),
+          results: finalResults,
+          totalBet: betTotal,
+          winAmount: winnings,
+          isWin,
+          timestamp: new Date(),
+        },
+        ...prev.slice(0, 9), // Giữ 10 lượt gần nhất
+      ]);
+
+      if (isWin) {
         setMoney((prev) => prev + winnings);
         setLastWin(winnings);
         toast.success(`🎉 Thắng ${winnings.toLocaleString()}đ!`);
@@ -215,6 +242,53 @@ const Index = () => {
           <p>👆 Click để đặt cược • 👆 Click phải để bỏ cược</p>
           <p className="mt-1">Thắng x1 mỗi xúc xắc trùng</p>
         </div>
+
+        {/* History Table */}
+        {history.length > 0 && (
+          <div className="mt-8 bg-black/30 backdrop-blur rounded-3xl p-4">
+            <h2 className="text-xl font-bold text-yellow-400 mb-4 text-center">
+              📜 Lịch Sử Chơi
+            </h2>
+            <ScrollArea className="h-64">
+              <div className="space-y-2">
+                {history.map((game) => (
+                  <div
+                    key={game.id}
+                    className={`flex items-center justify-between p-3 rounded-xl ${
+                      game.isWin
+                        ? "bg-green-500/20 border border-green-500/30"
+                        : "bg-red-500/20 border border-red-500/30"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex gap-1">
+                        {game.results.map((result, idx) => (
+                          <span key={idx} className="text-2xl">
+                            {symbols[result].emoji}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-white/60 text-sm">
+                        Cược: {game.totalBet.toLocaleString()}đ
+                      </div>
+                      <div
+                        className={`font-bold ${
+                          game.isWin ? "text-green-400" : "text-red-400"
+                        }`}
+                      >
+                        {game.isWin
+                          ? `+${game.winAmount.toLocaleString()}đ`
+                          : `-${game.totalBet.toLocaleString()}đ`}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
       </div>
     </div>
   );
