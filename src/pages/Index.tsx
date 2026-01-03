@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Dice, SymbolType, symbols } from "@/components/Dice";
+import { SymbolType, symbols } from "@/components/Dice";
+import { Dice3D } from "@/components/Dice3D";
 import { BetArea } from "@/components/BetArea";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -169,13 +170,9 @@ const Index = () => {
           )}
         </div>
 
-        {/* Dice Area */}
+        {/* 3D Dice Area */}
         <div className="bg-black/30 backdrop-blur rounded-3xl p-6 mb-6">
-          <div className="flex justify-center gap-4 md:gap-8">
-            {results.map((result, index) => (
-              <Dice key={index} result={result} isRolling={isRolling} index={index} />
-            ))}
-          </div>
+          <Dice3D results={results} isRolling={isRolling} />
         </div>
 
         {/* Bet Amount Selection */}
