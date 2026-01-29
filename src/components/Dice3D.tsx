@@ -15,13 +15,14 @@ const Dice3DBox = ({ isRolling, result, index }: Dice3DBoxProps) => {
   const targetRotation = useRef({ x: 0, y: 0, z: 0 });
   const symbol = symbols[result];
 
-  // Generate random target rotation when result changes
+  // Generate target rotation that shows front face correctly oriented
   useMemo(() => {
     if (!isRolling) {
+      // Keep front face visible with slight random tilt for variety
       targetRotation.current = {
-        x: Math.floor(Math.random() * 4) * Math.PI / 2,
-        y: Math.floor(Math.random() * 4) * Math.PI / 2,
-        z: Math.floor(Math.random() * 4) * Math.PI / 2,
+        x: (Math.random() - 0.5) * 0.3, // Small tilt up/down
+        y: (Math.random() - 0.5) * 0.3, // Small tilt left/right
+        z: 0, // No rotation on z-axis to keep emoji upright
       };
     }
   }, [result, isRolling]);
