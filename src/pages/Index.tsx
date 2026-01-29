@@ -5,24 +5,46 @@ import { Dice3D } from "@/components/Dice3D";
 import { BetArea } from "@/components/BetArea";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import confetti from "canvas-confetti";
 
 // Sound effects using Web Audio API
-const createDiceRollSound = (audioContext: AudioContext) => {
-  const oscillator = audioContext.createOscillator();
-  const gainNode = audioContext.createGain();
-  
-  oscillator.connect(gainNode);
-  gainNode.connect(audioContext.destination);
-  
-  oscillator.type = 'square';
-  oscillator.frequency.setValueAtTime(150 + Math.random() * 100, audioContext.currentTime);
-  oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.1);
-  
-  gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-  
-  oscillator.start(audioContext.currentTime);
-  oscillator.stop(audioContext.currentTime + 0.1);
+const createShakeSound = (audioContext: AudioContext) => {
+  // Tiếng lắc mạnh - nhiều tần số chồng lên nhau
+  for (let i = 0; i < 3; i++) {
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    const noise = audioContext.createBufferSource();
+    
+    // Tạo tiếng ồn trắng cho hiệu ứng lắc
+    const bufferSize = audioContext.sampleRate * 0.1;
+    const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let j = 0; j < bufferSize; j++) {
+      data[j] = (Math.random() * 2 - 1) * 0.3;
+    }
+    noise.buffer = buffer;
+    
+    const noiseGain = audioContext.createGain();
+    noise.connect(noiseGain);
+    noiseGain.connect(audioContext.destination);
+    noiseGain.gain.setValueAtTime(0.15, audioContext.currentTime + i * 0.03);
+    noiseGain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + i * 0.03 + 0.1);
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(100 + Math.random() * 150, audioContext.currentTime + i * 0.03);
+    oscillator.frequency.exponentialRampToValueAtTime(40, audioContext.currentTime + i * 0.03 + 0.1);
+    
+    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime + i * 0.03);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + i * 0.03 + 0.1);
+    
+    oscillator.start(audioContext.currentTime + i * 0.03);
+    oscillator.stop(audioContext.currentTime + i * 0.03 + 0.1);
+    noise.start(audioContext.currentTime + i * 0.03);
+    noise.stop(audioContext.currentTime + i * 0.03 + 0.1);
+  }
 };
 
 const createBounceSound = (audioContext: AudioContext) => {
@@ -33,14 +55,36 @@ const createBounceSound = (audioContext: AudioContext) => {
   gainNode.connect(audioContext.destination);
   
   oscillator.type = 'sine';
-  oscillator.frequency.setValueAtTime(400 + Math.random() * 200, audioContext.currentTime);
-  oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.05);
+  oscillator.frequency.setValueAtTime(600 + Math.random() * 400, audioContext.currentTime);
+  oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.08);
   
-  gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.05);
+  gainNode.gain.setValueAtTime(0.25, audioContext.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.08);
   
   oscillator.start(audioContext.currentTime);
-  oscillator.stop(audioContext.currentTime + 0.05);
+  oscillator.stop(audioContext.currentTime + 0.08);
+};
+
+const createResultSound = (audioContext: AudioContext) => {
+  // Tiếng "đùng" khi xúc xắc dừng
+  const notes = [220, 330, 440]; // A3, E4, A4 - hợp âm
+  
+  notes.forEach((freq, i) => {
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.type = 'triangle';
+    oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.4);
+  });
 };
 
 const createWinSound = (audioContext: AudioContext) => {
@@ -56,11 +100,42 @@ const createWinSound = (audioContext: AudioContext) => {
     oscillator.type = 'sine';
     oscillator.frequency.setValueAtTime(freq, audioContext.currentTime + i * 0.1);
     
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime + i * 0.1);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + i * 0.1 + 0.3);
+    gainNode.gain.setValueAtTime(0.35, audioContext.currentTime + i * 0.1);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + i * 0.1 + 0.4);
     
     oscillator.start(audioContext.currentTime + i * 0.1);
-    oscillator.stop(audioContext.currentTime + i * 0.1 + 0.3);
+    oscillator.stop(audioContext.currentTime + i * 0.1 + 0.4);
+  });
+};
+
+const createBigWinSound = (audioContext: AudioContext) => {
+  // Fanfare cho thắng lớn
+  const melody = [
+    { freq: 523.25, delay: 0 },     // C5
+    { freq: 659.25, delay: 0.1 },   // E5
+    { freq: 783.99, delay: 0.2 },   // G5
+    { freq: 1046.5, delay: 0.3 },   // C6
+    { freq: 1174.66, delay: 0.5 },  // D6
+    { freq: 1318.51, delay: 0.6 },  // E6
+    { freq: 1567.98, delay: 0.8 },  // G6
+    { freq: 2093, delay: 1 },       // C7
+  ];
+  
+  melody.forEach(({ freq, delay }) => {
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(freq, audioContext.currentTime + delay);
+    
+    gainNode.gain.setValueAtTime(0.4, audioContext.currentTime + delay);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + delay + 0.3);
+    
+    oscillator.start(audioContext.currentTime + delay);
+    oscillator.stop(audioContext.currentTime + delay + 0.3);
   });
 };
 
@@ -80,6 +155,90 @@ const createLoseSound = (audioContext: AudioContext) => {
   
   oscillator.start(audioContext.currentTime);
   oscillator.stop(audioContext.currentTime + 0.5);
+};
+
+// Confetti effects
+const triggerConfetti = () => {
+  // Bắn confetti từ cả hai bên
+  const count = 200;
+  const defaults = {
+    origin: { y: 0.7 },
+    zIndex: 9999,
+  };
+
+  function fire(particleRatio: number, opts: confetti.Options) {
+    confetti({
+      ...defaults,
+      ...opts,
+      particleCount: Math.floor(count * particleRatio),
+    });
+  }
+
+  fire(0.25, {
+    spread: 26,
+    startVelocity: 55,
+    origin: { x: 0.2, y: 0.7 },
+  });
+  
+  fire(0.2, {
+    spread: 60,
+    origin: { x: 0.5, y: 0.7 },
+  });
+  
+  fire(0.35, {
+    spread: 100,
+    decay: 0.91,
+    scalar: 0.8,
+    origin: { x: 0.8, y: 0.7 },
+  });
+  
+  fire(0.1, {
+    spread: 120,
+    startVelocity: 25,
+    decay: 0.92,
+    scalar: 1.2,
+    origin: { x: 0.5, y: 0.6 },
+  });
+  
+  fire(0.1, {
+    spread: 120,
+    startVelocity: 45,
+    origin: { x: 0.5, y: 0.7 },
+  });
+};
+
+const triggerBigWinConfetti = () => {
+  // Confetti cực lớn cho jackpot
+  const duration = 3000;
+  const animationEnd = Date.now() + duration;
+  const defaults = { 
+    startVelocity: 30, 
+    spread: 360, 
+    ticks: 60, 
+    zIndex: 9999,
+    colors: ['#FFD700', '#FFA500', '#FF6347', '#00FF00', '#00FFFF', '#FF00FF']
+  };
+
+  const interval: ReturnType<typeof setInterval> = setInterval(function() {
+    const timeLeft = animationEnd - Date.now();
+
+    if (timeLeft <= 0) {
+      return clearInterval(interval);
+    }
+
+    const particleCount = 50 * (timeLeft / duration);
+    
+    confetti({
+      ...defaults,
+      particleCount,
+      origin: { x: Math.random() * 0.4 + 0.1, y: Math.random() - 0.2 }
+    });
+    confetti({
+      ...defaults,
+      particleCount,
+      origin: { x: Math.random() * 0.4 + 0.5, y: Math.random() - 0.2 }
+    });
+  }, 250);
 };
 
 interface GameHistory {
@@ -128,18 +287,18 @@ const Index = () => {
   const startRollingSounds = useCallback(() => {
     const audioContext = initAudio();
     
-    // Play initial roll sound
-    createDiceRollSound(audioContext);
+    // Play initial shake sound
+    createShakeSound(audioContext);
     
     // Play bounce sounds at random intervals
     rollSoundIntervalRef.current = setInterval(() => {
       if (Math.random() > 0.3) {
         createBounceSound(audioContext);
       }
-      if (Math.random() > 0.6) {
-        createDiceRollSound(audioContext);
+      if (Math.random() > 0.5) {
+        createShakeSound(audioContext);
       }
-    }, 100);
+    }, 120);
   }, [initAudio]);
 
   const stopRollingSounds = useCallback(() => {
@@ -236,13 +395,28 @@ const Index = () => {
         ...prev.slice(0, 9), // Giữ 10 lượt gần nhất
       ]);
 
-      // Play win/lose sound
+      // Play result sound first
       const audioContext = initAudio();
+      createResultSound(audioContext);
+      
+      // Play win/lose sound and effects
       if (isWin) {
-        createWinSound(audioContext);
+        const isBigWin = winnings >= betTotal * 2; // Thắng gấp đôi trở lên
+        
+        setTimeout(() => {
+          if (isBigWin) {
+            createBigWinSound(audioContext);
+            triggerBigWinConfetti();
+            toast.success(`🎊🎉 THẮNG LỚN ${winnings.toLocaleString()}đ! 🎉🎊`);
+          } else {
+            createWinSound(audioContext);
+            triggerConfetti();
+            toast.success(`🎉 Thắng ${winnings.toLocaleString()}đ!`);
+          }
+        }, 300);
+        
         setMoney((prev) => prev + winnings);
         setLastWin(winnings);
-        toast.success(`🎉 Thắng ${winnings.toLocaleString()}đ!`);
       } else {
         createLoseSound(audioContext);
         toast.error("Chúc may mắn lần sau!");
