@@ -6,7 +6,7 @@ import { BetArea } from "@/components/BetArea";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import confetti from "canvas-confetti";
-import { Volume2, VolumeX } from "lucide-react";
+import { Volume2, VolumeX, Settings } from "lucide-react";
 
 // Sound effects using Web Audio API
 const createShakeSound = (audioContext: AudioContext) => {
@@ -273,6 +273,9 @@ const Index = () => {
   const [lastWin, setLastWin] = useState(0);
   const [history, setHistory] = useState<GameHistory[]>([]);
   const [isMuted, setIsMuted] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [adminFixedResults, setAdminFixedResults] = useState<(SymbolType | "")[]>(["", "", ""]);
+  const [adminUseFixed, setAdminUseFixed] = useState(false);
   
   const audioContextRef = useRef<AudioContext | null>(null);
   const rollSoundIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -365,11 +368,12 @@ const Index = () => {
       clearInterval(rollInterval);
       stopRollingSounds();
       
-      const finalResults: SymbolType[] = [
-        getRandomSymbol(),
-        getRandomSymbol(),
-        getRandomSymbol(),
-      ];
+      let finalResults: SymbolType[];
+      if (adminUseFixed && adminFixedResults.every(r => r !== "")) {
+        finalResults = adminFixedResults as SymbolType[];
+      } else {
+        finalResults = [getRandomSymbol(), getRandomSymbol(), getRandomSymbol()];
+      }
       setResults(finalResults);
       setIsRolling(false);
 
@@ -435,7 +439,7 @@ const Index = () => {
         nai: 0,
       });
     }, 2000);
-  }, [totalBet, bets, betAmount, startRollingSounds, stopRollingSounds, initAudio, isMuted]);
+  }, [totalBet, bets, betAmount, startRollingSounds, stopRollingSounds, initAudio, isMuted, adminUseFixed, adminFixedResults]);
 
   const handleClearBets = () => {
     const refund = totalBet * betAmount;
@@ -462,6 +466,14 @@ const Index = () => {
             title={isMuted ? "Bật âm thanh" : "Tắt âm thanh"}
           >
             {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+          </button>
+          {/* Admin Toggle */}
+          <button
+            onClick={() => setShowAdmin((prev) => !prev)}
+            className="absolute top-0 left-0 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white/80 hover:text-white"
+            title={showAdmin ? "Ẩn Admin" : "Hiện Admin"}
+          >
+            <Settings size={24} />
           </button>
           <h1 className="text-4xl md:text-6xl font-bold text-yellow-400 drop-shadow-lg mb-2">
             🎲 BẦU CUA 🎲
@@ -546,6 +558,134 @@ const Index = () => {
             <span className="text-white/80">
               Tổng cược: <span className="text-yellow-400 font-bold">{(totalBet * betAmount).toLocaleString()}đ</span>
             </span>
+          </div>
+        )}
+
+        {/* Admin Panel */}
+        {showAdmin && (
+          <div className="mt-8 bg-black/50 backdrop-blur border border-yellow-500/30 rounded-3xl p-6">
+            <h2 className="text-xl font-bold text-yellow-400 mb-4 text-center">
+              ⚙️ Bảng Điều Khiển Admin
+            </h2>
+
+            {/* Chỉnh tiền */}
+            <div className="mb-4">
+              <label className="text-white/80 text-sm block mb-2">💰 Chỉnh số tiền:</label>
+              <div className="flex flex-wrap gap-2">
+                {[500, 1000, 5000, 10000, 50000].map((amount) => (
+                  <Button
+                    key={amount}
+                    onClick={() => setMoney(amount)}
+                    variant="outline"
+                    className="bg-white/10 text-white border-white/30 hover:bg-white/20 text-sm"
+                  >
+                    {amount.toLocaleString()}đ
+                  </Button>
+                ))}
+                <Button
+                  onClick={() => setMoney((prev) => prev + 1000)}
+                  className="bg-green-600 hover:bg-green-700 text-white text-sm"
+                >
+                  +1.000đ
+                </Button>
+              </div>
+            </div>
+
+            {/* Fix kết quả xúc xắc */}
+            <div className="mb-4">
+              <div className="flex items-center gap-3 mb-2">
+                <label className="text-white/80 text-sm">🎯 Fix kết quả xúc xắc:</label>
+                <button
+                  onClick={() => setAdminUseFixed((prev) => !prev)}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
+                    adminUseFixed
+                      ? "bg-red-500 text-white"
+                      : "bg-white/20 text-white/60"
+                  }`}
+                >
+                  {adminUseFixed ? "🔴 ĐANG FIX" : "⚪ TẮT"}
+                </button>
+              </div>
+              <div className="flex gap-2">
+                {[0, 1, 2].map((diceIdx) => (
+                  <select
+                    key={diceIdx}
+                    value={adminFixedResults[diceIdx]}
+                    onChange={(e) => {
+                      const newResults = [...adminFixedResults];
+                      newResults[diceIdx] = e.target.value as SymbolType | "";
+                      setAdminFixedResults(newResults);
+                    }}
+                    className="bg-white/10 text-white border border-white/30 rounded-lg px-3 py-2 text-sm flex-1"
+                  >
+                    <option value="" className="bg-gray-800">Ngẫu nhiên</option>
+                    {symbolKeys.map((s) => (
+                      <option key={s} value={s} className="bg-gray-800">
+                        {symbols[s].emoji} {symbols[s].name}
+                      </option>
+                    ))}
+                  </select>
+                ))}
+              </div>
+            </div>
+
+            {/* Xem trước cược */}
+            <div className="mb-4">
+              <label className="text-white/80 text-sm block mb-2">📊 Cược hiện tại:</label>
+              <div className="grid grid-cols-3 gap-2">
+                {symbolKeys.map((s) => (
+                  bets[s] > 0 && (
+                    <div key={s} className="bg-white/10 rounded-lg p-2 text-center">
+                      <span className="text-xl">{symbols[s].emoji}</span>
+                      <div className="text-yellow-400 text-sm font-bold">
+                        {bets[s]} × {betAmount.toLocaleString()}đ
+                      </div>
+                      <div className="text-white/60 text-xs">
+                        = {(bets[s] * betAmount).toLocaleString()}đ
+                      </div>
+                    </div>
+                  )
+                ))}
+              </div>
+              {totalBet === 0 && (
+                <p className="text-white/40 text-sm text-center">Chưa đặt cược</p>
+              )}
+            </div>
+
+            {/* Thống kê */}
+            <div className="mb-2">
+              <label className="text-white/80 text-sm block mb-2">📈 Thống kê:</label>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-white/10 rounded-lg p-2">
+                  <div className="text-white/60 text-xs">Tổng ván</div>
+                  <div className="text-white font-bold">{history.length}</div>
+                </div>
+                <div className="bg-green-500/20 rounded-lg p-2">
+                  <div className="text-green-400/80 text-xs">Thắng</div>
+                  <div className="text-green-400 font-bold">{history.filter(h => h.isWin).length}</div>
+                </div>
+                <div className="bg-red-500/20 rounded-lg p-2">
+                  <div className="text-red-400/80 text-xs">Thua</div>
+                  <div className="text-red-400 font-bold">{history.filter(h => !h.isWin).length}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Reset */}
+            <div className="mt-4 flex justify-center">
+              <Button
+                onClick={() => {
+                  setMoney(1000);
+                  setHistory([]);
+                  setLastWin(0);
+                  setBets({ bau: 0, cua: 0, ca: 0, ga: 0, tom: 0, nai: 0 });
+                  toast.success("Đã reset game!");
+                }}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                🔄 Reset Game
+              </Button>
+            </div>
           </div>
         )}
 
