@@ -6,6 +6,7 @@ import { BetArea } from "@/components/BetArea";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import confetti from "canvas-confetti";
+import { Volume2, VolumeX } from "lucide-react";
 
 // Sound effects using Web Audio API
 const createShakeSound = (audioContext: AudioContext) => {
@@ -271,6 +272,7 @@ const Index = () => {
   const [isRolling, setIsRolling] = useState(false);
   const [lastWin, setLastWin] = useState(0);
   const [history, setHistory] = useState<GameHistory[]>([]);
+  const [isMuted, setIsMuted] = useState(false);
   
   const audioContextRef = useRef<AudioContext | null>(null);
   const rollSoundIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -285,6 +287,7 @@ const Index = () => {
 
   // Play rolling sounds continuously while dice are rolling
   const startRollingSounds = useCallback(() => {
+    if (isMuted) return;
     const audioContext = initAudio();
     
     // Play initial shake sound
@@ -299,7 +302,7 @@ const Index = () => {
         createShakeSound(audioContext);
       }
     }, 120);
-  }, [initAudio]);
+  }, [initAudio, isMuted]);
 
   const stopRollingSounds = useCallback(() => {
     if (rollSoundIntervalRef.current) {
@@ -397,7 +400,7 @@ const Index = () => {
 
       // Play result sound first
       const audioContext = initAudio();
-      createResultSound(audioContext);
+      if (!isMuted) createResultSound(audioContext);
       
       // Play win/lose sound and effects
       if (isWin) {
@@ -405,11 +408,11 @@ const Index = () => {
         
         setTimeout(() => {
           if (isBigWin) {
-            createBigWinSound(audioContext);
+            if (!isMuted) createBigWinSound(audioContext);
             triggerBigWinConfetti();
             toast.success(`🎊🎉 THẮNG LỚN ${winnings.toLocaleString()}đ! 🎉🎊`);
           } else {
-            createWinSound(audioContext);
+            if (!isMuted) createWinSound(audioContext);
             triggerConfetti();
             toast.success(`🎉 Thắng ${winnings.toLocaleString()}đ!`);
           }
@@ -418,7 +421,7 @@ const Index = () => {
         setMoney((prev) => prev + winnings);
         setLastWin(winnings);
       } else {
-        createLoseSound(audioContext);
+        if (!isMuted) createLoseSound(audioContext);
         toast.error("Chúc may mắn lần sau!");
       }
 
@@ -432,7 +435,7 @@ const Index = () => {
         nai: 0,
       });
     }, 2000);
-  }, [totalBet, bets, betAmount, startRollingSounds, stopRollingSounds, initAudio]);
+  }, [totalBet, bets, betAmount, startRollingSounds, stopRollingSounds, initAudio, isMuted]);
 
   const handleClearBets = () => {
     const refund = totalBet * betAmount;
@@ -451,7 +454,15 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-br from-red-900 via-red-800 to-amber-900 p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-6">
+        <div className="text-center mb-6 relative">
+          {/* Sound Toggle */}
+          <button
+            onClick={() => setIsMuted((prev) => !prev)}
+            className="absolute top-0 right-0 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white/80 hover:text-white"
+            title={isMuted ? "Bật âm thanh" : "Tắt âm thanh"}
+          >
+            {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+          </button>
           <h1 className="text-4xl md:text-6xl font-bold text-yellow-400 drop-shadow-lg mb-2">
             🎲 BẦU CUA 🎲
           </h1>
