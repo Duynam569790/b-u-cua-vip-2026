@@ -65,7 +65,7 @@ const Dice3DBox = ({ isRolling, result, index }: Dice3DBoxProps) => {
   };
 
   return (
-    <mesh ref={meshRef} position={[(index - 1) * 2.5, 0, 0]}>
+    <mesh ref={meshRef} position={[(index - 1) * 2.5, 0, 0]} castShadow>
       <RoundedBox args={[1.8, 1.8, 1.8]} radius={0.15} smoothness={4}>
         <meshStandardMaterial color={colorMap[result]} />
       </RoundedBox>
@@ -101,11 +101,29 @@ interface Dice3DProps {
 export const Dice3D = ({ results, isRolling }: Dice3DProps) => {
   return (
     <div className="w-full h-48 md:h-64">
-      <Canvas camera={{ position: [0, 2, 8], fov: 45 }}>
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[5, 5, 5]} intensity={1} />
-        <directionalLight position={[-5, -5, -5]} intensity={0.3} />
-        <pointLight position={[0, 5, 0]} intensity={0.5} />
+      <Canvas camera={{ position: [0, 2, 8], fov: 45 }} shadows>
+        <ambientLight intensity={0.4} />
+        <directionalLight
+          position={[5, 8, 5]}
+          intensity={1.2}
+          castShadow
+          shadow-mapSize-width={1024}
+          shadow-mapSize-height={1024}
+          shadow-camera-far={20}
+          shadow-camera-near={0.5}
+          shadow-camera-left={-6}
+          shadow-camera-right={6}
+          shadow-camera-top={6}
+          shadow-camera-bottom={-6}
+        />
+        <directionalLight position={[-5, -5, -5]} intensity={0.2} />
+        <pointLight position={[0, 5, 0]} intensity={0.4} />
+        
+        {/* Shadow-receiving ground plane */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.5, 0]} receiveShadow>
+          <planeGeometry args={[20, 20]} />
+          <shadowMaterial opacity={0.3} />
+        </mesh>
         
         {results.map((result, index) => (
           <Dice3DBox
